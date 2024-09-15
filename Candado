@@ -1,0 +1,119 @@
+#include <Adafruit_LiquidCrystal.h>
+#include <Keypad.h>
+#include <Servo.h>
+
+// Configuración del teclado numérico
+const byte ROWS = 4; // Cuatro filas
+const byte COLS = 4; // Cuatro columnas
+char keys[ROWS][COLS] = {
+  {'1', '2', '3', 'A'},
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+byte rowPins[ROWS] = {9, 8, 7, 6}; // Pines conectados a las filas
+byte colPins[COLS] = {5, 4, 3, 2}; // Pines conectados a las columnas
+
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+// Configuración de la pantalla LCD
+Adafruit_LiquidCrystal lcd_1(0); // Iniciar el objeto LCD
+
+// Configuración del Servo Motor
+Servo myServo;  // Crear objeto servo
+
+// Variables para la contraseña
+String password = "1234";  // Contraseña correcta
+String input_password = "";  // Contraseña ingresada
+int attempt_count = 0;  // Contador de intentos
+int max_attempts = 3;  // Máximo número de intentos
+
+// Configuración del botón
+const int buttonPin = 12;  // Pin al que está conectado el botón
+bool isServoClosed = false;  // Variable para saber si el servo está cerrado
+
+void setup() {
+  lcd_1.begin(16, 2); // Inicializar la pantalla LCD de 16x2
+  lcd_1.clear();
+  lcd_1.setCursor(0, 0);
+  lcd_1.print("Ingrese clave:"); // Mostrar mensaje inicial
+  myServo.attach(10); // Conectar el servo al pin 10 de Arduino
+  myServo.write(0);   // Iniciar el servo en la posición de "cerrado" (0 grados)
+  isServoClosed = true;  // Marcar que el servo empieza en posición cerrada
+  
+  pinMode(buttonPin, INPUT_PULLUP);  // Configurar el pin del botón con resistencia pull-up
+}
+
+void loop() {
+  // Leer la tecla presionada
+  char key = keypad.getKey();
+
+  if (key) { // Si una tecla es presionada
+    // Solo permitir ingreso si no está bloqueado
+    if (attempt_count < max_attempts) {
+      if (key == '#') {  // Comprobamos si la tecla es '#' para validar la contraseña
+        lcd_1.clear();  // Limpiar la pantalla antes de mostrar cualquier mensaje
+        delay(100);  // Pausa corta para evitar superposición
+        if (input_password == password) {
+          lcd_1.setCursor(0, 0);
+          lcd_1.print("Acceso Permitido");
+          myServo.write(90);  // Abrir la puerta (girar el servo a 90 grados)
+          isServoClosed = false;  // Marcar que el servo está abierto
+          delay(2000);
+          lcd_1.clear();
+          lcd_1.setCursor(0, 0);
+          lcd_1.print("Puerta Abierta");
+        } else {
+          attempt_count++;  // Aumentar el contador de intentos
+          lcd_1.clear();
+          delay(100);  // Pausa corta para evitar superposición
+          lcd_1.setCursor(0, 0);
+          lcd_1.print("Clave Incorrecta");
+          delay(2000);
+          if (attempt_count < max_attempts) {
+            lcd_1.clear();
+            delay(100);  // Pausa corta para evitar superposición
+            lcd_1.setCursor(0, 0);
+            lcd_1.print("Intentos: ");
+            lcd_1.print(attempt_count);
+            lcd_1.setCursor(0, 1);
+            delay(2000);
+            lcd_1.clear();
+            lcd_1.print("Ingrese clave:");
+          }
+        }
+        input_password = "";  // Reiniciar la entrada
+      }
+      else if (key == '*') {  // Reiniciar entrada con '*'
+        lcd_1.clear();  // Limpiar la pantalla antes de reiniciar
+        delay(100);  // Pausa corta para evitar superposición
+        input_password = "";
+        lcd_1.setCursor(0, 0);
+        lcd_1.print("Ingrese clave:");
+      }
+      else if (input_password.length() < 4) {
+        input_password += key;  // Añadir la tecla presionada a la contraseña
+        lcd_1.setCursor(input_password.length() - 1, 1);  // Mover el cursor para el siguiente caracter
+        lcd_1.print('*');  // Mostrar asterisco en lugar del número
+      }
+    } else {
+      lcd_1.clear();
+      delay(100);  // Pausa corta para evitar superposición
+      lcd_1.setCursor(0, 0);
+      lcd_1.print("Bloqueado");
+    }
+  }
+
+  // Verificar si se presiona el botón para cerrar el servo
+  if (digitalRead(buttonPin) == LOW) {  // El botón está presionado (se detecta LOW)
+    if (!isServoClosed) {  // Si el servo no está cerrado
+      myServo.write(0);  // Cerrar el servo (girar a 0 grados)
+      lcd_1.clear();  // Limpiar la pantalla antes de mostrar el mensaje
+      delay(100);  // Pausa corta para evitar superposición
+      lcd_1.setCursor(0, 0);
+      lcd_1.print("Servo cerrado");
+      isServoClosed = true;  // Marcar que el servo está cerrado
+      delay(2000);  // Evitar rebotes del botón
+    }
+  }
+}
